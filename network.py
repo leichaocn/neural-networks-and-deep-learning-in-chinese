@@ -66,7 +66,12 @@ class Network(object):
         network will be evaluated against the test data after each
         epoch, and partial progress printed out.  This is useful for
         tracking progress, but slows things down substantially."""
-        if test_data: n_test = len(test_data)
+
+        """
+        这是训练的大框架，用多轮epoch进行权重更新
+        """
+        if test_data:
+            n_test = len(test_data)
         n = len(training_data)
         for j in range(epochs):
             random.shuffle(training_data)
@@ -74,10 +79,18 @@ class Network(object):
             mini_batches = [
                 training_data[k:k+mini_batch_size]
                 for k in range(0, n, mini_batch_size)]
+
+            """
+            这是一个epoch里的权重更新
+            """
             # 遍历所有mini_batch，即为一个epoch
             for mini_batch in mini_batches:
+                """
+                这是一个mini_batch里的权重更新，update_mini_batch是核心实现。
+                """
                 # 使用mini_batch里的若干样本，以及学习率eta，对权重和偏置进行一次迭代。
                 self.update_mini_batch(mini_batch, eta)
+
             # 测试，该步为可选；如果提供了测试集，将输出本轮epoch的测试结果
             if test_data:
                 print("Epoch {0}: {1} / {2}".format(
@@ -91,25 +104,32 @@ class Network(object):
         gradient descent using backpropagation to a single mini batch.
         The ``mini_batch`` is a list of tuples ``(x, y)``, and ``eta``
         is the learning rate."""
+
+        """初始化权重的梯度为零
+        """
         # nabla表示倒三角算子，即梯度
-        # nabla_w为数组，长度为层数-1，元素是矩阵，对应每一层的权重矩阵，其形状为本层神经元个数*上层神经元个数
-        # nabla_w为数组，长度为层数-1，元素为向量，对应每一层的偏置向量，其形状为本层神经元个数*1
+        # nabla_b为数组，长度为层数-1，元素为向量，对应每一层的偏置向量，其形状为本层神经元个数*1
         nabla_b = [np.zeros(b.shape) for b in self.biases]
+        # nabla_w为数组，长度为层数-1，元素是矩阵，对应每一层的权重矩阵，其形状为本层神经元个数*上层神经元个数
         nabla_w = [np.zeros(w.shape) for w in self.weights]
         for x, y in mini_batch:
+            """获取一条样本上，损失函数对于权重的梯度，backprop是更核心的实现。
+            """
             # x表示输入，y表示目标值。
             # 获得单个样本x，y时，代价对w和b的梯度
             delta_nabla_b, delta_nabla_w = self.backprop(x, y)
-            # 太牛了这一步！！！对于每个mini-batch
+            # 对于每个mini-batch
             # 第一个样本x,y进来后，右侧的nabla_b为零向量数组，长度为层数，[全零的列向量1,全零的列向量2]
-            # 此时delta_nabla_b为第一个样本计算出来的偏置梯度数组，与nabla_b有相同的长度、相同的元素尺寸！
-            # 这样便计算出了第一个样本对应的梯度向量的数组，形状跟这两个数组的尺寸、元素尺寸一模一样！
-            # 第二个样本x,y进来后，右侧的nabla_b为上一个样本计算出的梯度向量数组，与本轮的梯度向量数组，对应的向量按元素相加！
-            # 直到最后一个样本，获得的nabla_b将是整个mini_batch上计算出的累加梯度总和，依然为一个数组，跟上面的所有数据拥有相同的尺寸、元素尺寸！
+            # 此时delta_nabla_b为第一个样本计算出来的偏置梯度数组，与nabla_b有相同的长度、相同的元素尺寸。
+            # 这样便计算出了第一个样本对应的梯度向量的数组，形状跟这两个数组的尺寸、元素尺寸一模一样。
+            # 第二个样本x,y进来后，右侧的nabla_b为上一个样本计算出的梯度向量数组，与本轮的梯度向量数组，对应的向量按元素相加。
+            # 直到最后一个样本，获得的nabla_b将是整个mini_batch上计算出的累加梯度总和，依然为一个数组，跟上面的所有数据拥有相同的尺寸、元素尺寸。
             nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             # nabla_w跟上面同理，也是一个数组，长度是层数-1，只是元素换成了矩阵，每个矩阵的尺寸为本层神经元个数*上层神经元个数
             nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
 
+        """在一个mini_batch上对把所有样本计算出的梯度迭代量 累加起来后，才进行权重更新。
+        """
         # nabla_w是梯度向量，nw为其元素
         # w是矩阵，nw也是矩阵，形状均为本层个数*上层个数
         # nw是矩阵，尺寸同w，nw是在整个mini_batch上，每个元素均为累加每一个样本代价对该位置的权重的误差（代价对本）求出来的总和。
@@ -117,6 +137,7 @@ class Network(object):
                         for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b-(eta/len(mini_batch))*nb
                        for b, nb in zip(self.biases, nabla_b)]
+
 
     def backprop(self, x, y):
         """Return a tuple ``(nabla_b, nabla_w)`` representing the
@@ -128,6 +149,10 @@ class Network(object):
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
 
+        """先前向传播
+        计算出每一层的加权和、激活值，分别保存在数组里
+        注：activations比zs多一个元素。因为输入层神经元只有激活值，没有加权和值。
+        """
         # feedforward
         # 输入层的激活值
         activation = x
@@ -144,6 +169,16 @@ class Network(object):
             activation = sigmoid(z)
             activations.append(activation)
 
+        """然后反向传播
+        总体思想是：迭代下面这个循环
+                  1.先计算出前一层的delta，
+                  2.然后本层的w=delta*对应的激活值 
+                             b=delta
+        注意，1.这个delta，是指从代价函数一直求导到本层的加权和。
+             2. 输出层的 delta = 代价函数对激活值的导数 * 本层激活值对加权和的导数 
+                其他层 delta = 后一层的已知delta * 权重矩阵 * 本层激活值对加权和的导数 
+                所谓 本层激活值对加权和的导数 其实就是本层的权重矩阵
+        """
         # 计算误差
         # backward pass
         # cost_derivative是计算代价对输出层激活值的梯度，返回一个列向量，行数为输出层神经元个数
